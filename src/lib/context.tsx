@@ -1,9 +1,35 @@
-import { ComponentType, createContext, ReactNode, useContext } from 'react'
+import { ComponentType, createContext, ReactNode, RefObject, useContext, useReducer, useRef } from 'react'
+import { assert } from './utils'
+import { useIsomorphicEffect } from '../hooks/use-isomorphic-effect'
 
-const ResourceContext = createContext<Record<string, unknown>>(undefined!)
+type ResourceCollection<Data extends Record<string, unknown>> = RefObject<{
+  data: Data
+  listeners: Set<(data: Data) => void>
+}>
 
-function ResourceProvider<T extends Record<string, unknown>>({ children, hook }: { children: React.ReactNode; hook: () => T }) {
-  return <ResourceContext.Provider value={hook()}>{children}</ResourceContext.Provider>
+const ResourceContext = createContext<ResourceCollection<Record<string, unknown>>>(undefined!)
+
+function ResourceProvider<Data extends Record<string, unknown>>({ children, useResource }: { children: React.ReactNode; useResource: () => Data }) {
+  const data = useResource()
+
+  const resourceCollection = useRef({
+    data,
+    listeners: new Set<(data: Data) => void>(),
+  })
+
+  const isMounted = useRef(false)
+
+  useIsomorphicEffect(() => {
+    if (!isMounted.current) {
+      isMounted.current = true
+      return
+    }
+
+    resourceCollection.current.data = data
+    resourceCollection.current.listeners.forEach((listener) => listener(data))
+  }, [data])
+
+  return <ResourceContext.Provider value={resourceCollection as ResourceCollection<Record<string, unknown>>}>{children}</ResourceContext.Provider>
 }
 
 // 제너릭이 여러개일때...
@@ -14,7 +40,7 @@ export function withResource<Props extends Record<string, unknown>, Resource ext
   hook: () => Resource,
 ) {
   const WithResourceComponent: ComponentType<Props> = (props) => (
-    <ResourceProvider hook={hook}>
+    <ResourceProvider useResource={hook}>
       <Component {...props} />
     </ResourceProvider>
   )
@@ -24,14 +50,37 @@ export function withResource<Props extends Record<string, unknown>, Resource ext
   return WithResourceComponent
 }
 
-function useResource<T extends Record<string, unknown> = Record<string, unknown>>() {
-  const value = useContext(ResourceContext)
+function useResource<Data extends Record<string, unknown> = Record<string, unknown>, Selected extends Record<string, unknown> = Data>(
+  select: (data: Data) => Selected,
+) {
+  const resourceCollection = useContext(ResourceContext) as ResourceCollection<Data>
 
-  if (!value) {
-    throw new Error('Resource is not found.')
-  }
+  assert(typeof resourceCollection !== undefined, 'ResourceCollection is not found.')
 
-  return value as T
+  const { data, listeners } = resourceCollection.current
+
+  const [state, dispatch] = useReducer((prev, cur) => {
+    const selected = select(cur)
+
+    // FIXME: object는 매번 새로 생성되니까 다른게 당연함....
+    console.log(prev, selected, prev === selected)
+
+    if (prev !== selected) {
+      return selected
+    }
+
+    return prev
+  }, select(data))
+
+  useIsomorphicEffect(() => {
+    listeners.add(dispatch)
+
+    return () => {
+      listeners.delete(dispatch)
+    }
+  }, [listeners])
+
+  return state
 }
 
 // 뭔가 여기에 타입하나가 더 있으면 문제가 해결될것같기도한데;;;;
@@ -42,11 +91,11 @@ export function generateRender<Data extends Record<string, unknown>>() {
     children,
   }: {
     select?: (data: Data) => Selected
-    children: (selected: ReturnType<typeof select>) => ReactNode
+    children: (selected: Selected) => ReactNode
   }) {
-    const data = useResource<Data>()
+    const selected = useResource<Data, Selected>(select)
 
-    return children(select(data))
+    return children(selected)
   }
 }
 

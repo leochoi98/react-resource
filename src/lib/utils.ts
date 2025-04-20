@@ -6,3 +6,13 @@ export function value<T, A>(fn: (arg?: A) => T, arg?: A): T {
 
 // const $hello = value(() => 'hello')
 // const $helloWithArg = value((arg) => `hello ${arg}`, 'world')
+
+export function assert(condition: boolean, message: string | Error): asserts condition {
+  if (!condition) {
+    if (typeof message === 'string') {
+      throw new Error(message)
+    }
+
+    throw message
+  }
+}
