@@ -59,11 +59,11 @@ function useResource<Data extends Record<string, unknown> = Record<string, unkno
 
   const { data, listeners } = resourceCollection.current
 
-  const [state, dispatch] = useReducer((prev, cur) => {
-    const selected = select(cur)
+  const [state, dispatch] = useReducer((prev) => {
+    const selected = select(data)
 
     // FIXME: object는 매번 새로 생성되니까 다른게 당연함....
-    console.log(prev, selected, prev === selected)
+    // console.log(prev, selected, prev === selected)
 
     if (prev !== selected) {
       return selected
