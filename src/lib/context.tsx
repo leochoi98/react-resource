@@ -6,8 +6,9 @@ function ResourceProvider<T extends Record<string, unknown>>({ children, hook }:
   return <ResourceContext.Provider value={hook()}>{children}</ResourceContext.Provider>
 }
 
+// 제너릭이 여러개일때...
 // 첫번째 제너릭에만 타입 넣어주면 에러남 ㅎㅎ,,,
-// default 값의 의미는 진짜 제네릭을 직접 넣지 않는 이상 default로 처리하겠다는 의미
+// 두번쨰 제너릭에 디폴트값 넣어줘도 진짜 디폴트로 처리됨
 export function withResource<Props extends Record<string, unknown>, T extends Record<string, unknown>>(Component: ComponentType<Props>, hook: () => T) {
   const WithResourceComponent: ComponentType<Props> = (props) => (
     <ResourceProvider hook={hook}>
